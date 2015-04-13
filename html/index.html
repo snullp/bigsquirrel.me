@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Welcome to BigSquirrel.Me</title>
+<style>
+    body {background-color: black}
+    h1 {color: white; text-align: center}
+    .canvas-div {width: 800px; height: 600px; margin: 0 auto; position: relative}
+    .canvas {width: 100%; height: 100%}
+    .footer {text-align: center}
+    .star {background-color: white; width: 2px; height: 2px;  margin: 0; position: absolute}
+    .input-box {width: 400px}
+    .popup {color: white; position: absolute}
+</style>
+</head>
+<body>
+    <h1>We are all like stars, in this gigantic universe...</h1>
+    <div class="canvas-div"><canvas class="canvas" width="800" height="600"></canvas></div>
+    <div class="footer">
+        <form id="chat-form" action="#">
+            <input class="input-box" placeholder="Broadcast your 'Hi!'">
+        </form>
+    </div>
+</body>
+<script>
+    (function(){
+        // 200 px per second
+        var speed = 200;
+        var canvas_div = document.getElementsByClassName("canvas-div")[0];
+        var show_msg = function(x, y, msg) {
+            var popup = document.createElement("div");
+            popup.className = "popup";
+            popup.style.left = (x - 30) + "px";
+            popup.style.top = (y - 25) + "px";
+            popup.innerHTML = msg;
+            canvas_div.appendChild(popup);
+            setTimeout(function(){
+                canvas_div.removeChild(popup);
+            }, 3000);
+        };
+        var new_star = function(x, y, timeout){
+            var star = document.createElement("div");
+            star.className = "star";
+            star.style.left = x + "px";
+            star.style.top = y + "px";
+            canvas_div.appendChild(star);
+            if (timeout) {
+                setTimeout(function(){
+                    canvas_div.removeChild(star);
+                }, timeout);
+            }
+        };
+        var my_coor = null;
+        var websocket = new WebSocket("ws://bigsquirrel.me:8000");
+        websocket.onopen = function(evt) {
+            console.log(evt);
+        };
+        websocket.onclose = function(evt) {
+            console.log(evt);
+        };
+        websocket.onmessage = function(evt) {
+            console.log(evt);
+            var data = JSON.parse(evt.data);
+            switch (data.action){
+                case "init":
+                    var coor = data.coordinate;
+                    my_coor = coor;
+                    new_star(coor[0], coor[1], null);
+                    show_msg(coor[0], coor[1], "This is you!");
+                    break;
+                case "msg":
+                    var coor = data.coordinate;
+                    var msg = data.msg;
+                    var distance = Math.sqrt(Math.pow(my_coor[0] - coor[0], 2) + Math.pow(my_coor[1] - coor[1], 2));
+                    setTimeout(function(){
+                        new_star(coor[0], coor[1], null);
+                        show_msg(coor[0], coor[1], msg);
+                    }, distance / speed * 1000);
+                    break;
+                default:
+                    break;
+            }
+        };
+        websocket.onerror = function(evt) {
+            console.log(evt);
+        };
+        var input_box = document.getElementsByClassName("input-box")[0];
+        var chat_form = document.getElementById("chat-form");
+        var canvas = document.getElementsByClassName("canvas")[0];
+        var ctx = canvas.getContext("2d");
+        ctx.fillStyle = "black";
+        ctx.strokeStyle = "white";
+        var animation_radius_step = 4;
+        var animate_broadcast = function() {
+            var radius = 1;
+            var animation = setInterval(function(){
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                ctx.beginPath();
+                ctx.arc(my_coor[0], my_coor[1], radius, 0, 2*Math.PI);
+                ctx.stroke();
+                radius += animation_radius_step;
+                if (radius > 1000) {
+                    clearInterval(animation);
+                }
+            }, animation_radius_step * 1000.0 / speed);
+        }
+        chat_form.onsubmit = function(e){
+            if (input_box.value !== "") {
+                console.log(input_box.value);
+                websocket.send(input_box.value);
+                input_box.value = "";
+                animate_broadcast();
+            }
+            return false;
+        };
+    })();
+</script>
+</html>
